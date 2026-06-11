@@ -1,12 +1,19 @@
 import telebot
 import google.generativeai as genai
 import time
+from threading import Thread
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # ==================================================
-# 1. CONFIGURACIONES (Pon aquí tu token y api key)
+# 1. CONFIGURACIONES (las variables de entorno se leen automáticamente)
 # ==================================================
-TELEGRAM_TOKEN = "8831845313:AAEJKMtg2qER7-UwFwAzz81I7S3d2hSIMdo"  # <-- Reemplaza si cambiaste el token
-GEMINI_API_KEY = "AIzaSyXXXXXXXXXXXX"  # <-- Pon tu API Key de Google AI Studio
+import os
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+
+if not TELEGRAM_TOKEN or not GEMINI_API_KEY:
+    print("❌ Faltan variables de entorno. Asegúrate de configurar TELEGRAM_TOKEN y GEMINI_API_KEY en Render.")
+    exit(1)
 
 # ==================================================
 # 2. PROMPT 2.0 UNIFICADO (Gene + Protocolo)
@@ -93,7 +100,29 @@ def handle_message(message):
         bot.reply_to(message, "... Hubo un error. Dame un segundo y vuelve a intentarlo. ...\n\nHay que dejar el mundo mejor de como lo encontramos – B.P. ⚜️\n- By Wilber -")
 
 # ==================================================
-# 5. INICIAR EL BOT
+# 5. SERVIDOR HTTP SIMPLE PARA QUE RENDER NO MATE EL PROCESO
+# ==================================================
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/plain')
+        self.end_headers()
+        self.wfile.write(b'OK')
+    def log_message(self, format, *args):
+        pass  # silenciar logs del servidor HTTP
+
+def run_http_server():
+    port = int(os.environ.get("PORT", 8000))
+    server = HTTPServer(('0.0.0.0', port), HealthHandler)
+    server.serve_forever()
+
+# Iniciar el servidor HTTP en un hilo separado
+http_thread = Thread(target=run_http_server, daemon=True)
+http_thread.start()
+print(f"✅ Servidor HTTP iniciado en el puerto {os.environ.get('PORT', 8000)}")
+
+# ==================================================
+# 6. INICIAR EL BOT
 # ==================================================
 print("🚀 Bot DomingoIA+ 2.0 Unificado está corriendo...")
 bot.infinity_polling()
